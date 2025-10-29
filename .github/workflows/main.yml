@@ -1,0 +1,67 @@
+name: RDP
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Enable RDP and firewall
+        shell: powershell
+        run: |
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' UserAuthentication 0
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' SecurityLayer 0
+          netsh advfirewall firewall delete rule name="RDP-Tailscale" 2>$null
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+
+      - name: Create XService user
+        shell: powershell
+        run: |
+          $pass = -join ((33..126) | Get-Random -Count 20 | % {[char]$_})
+          $sec  = ConvertTo-SecureString $pass -AsPlainText -Force
+          if (Get-LocalUser -Name XService -ErrorAction SilentlyContinue) {
+            Set-LocalUser -Name XService -Password $sec -PasswordNeverExpires:$true
+          } else {
+            New-LocalUser -Name XService -Password $sec -PasswordNeverExpires:$true -AccountNeverExpires:$true
+          }
+          Add-LocalGroupMember Administrators XService -ErrorAction SilentlyContinue
+          Add-LocalGroupMember "Remote Desktop Users" XService -ErrorAction SilentlyContinue
+          echo "RDP_USER=XService" >> $env:GITHUB_ENV
+          echo "RDP_PASS=$pass"   >> $env:GITHUB_ENV
+
+      - name: Install Tailscale v1.88.4
+        shell: powershell
+        run: |
+          $msi = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.88.4-amd64.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i","`"$msi`"","/quiet","/norestart" -Wait
+          Remove-Item $msi -Force
+
+      - name: Connect Tailscale
+        shell: powershell
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname="xsvc-${{ github.run_id }}"
+          for ($i=0; $i -lt 30; $i++) {
+            $ip = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+            if ($ip) { echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV; break }
+            Start-Sleep 5
+          }
+          if (-not $ip) { throw "No Tailscale IP" }
+
+      - name: Initialize XService profile
+        shell: powershell
+        run: |
+          $u=$env:RDP_USER; $p=ConvertTo-SecureString $env:RDP_PASS -AsPlainText -Force
+          $cred=New-Object PSCredential($u,$p)
+          Start-Process cmd.exe -Credential $cred -ArgumentList "/c whoami" -WindowStyle Hidden -Wait
+
+      - name: Output and keep alive
+        shell: powershell
+        run: |
+          Write-Host "Address: $env:TAILSCALE_IP"
+          Write-Host "Username: $env:RDP_USER"
+          Write-Host "Password: $env:RDP_PASS"
+          while ($true) { Write-Host "[$(Get-Date)] Active"; Start-Sleep 300 }
