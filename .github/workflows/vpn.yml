@@ -8,29 +8,18 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Install Tailscale
+      - name: Install Tailscale (fast)
         run: curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Connect as exit node (protected)
+      - name: Connect as exit node
         run: |
-          # Bring up Tailscale as exit node
           sudo tailscale up \
             --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} \
             --hostname="vpn-${{ github.run_id }}" \
             --advertise-exit-node
+          echo "TAILSCALE_IP=$(tailscale ip -4)" >> $GITHUB_ENV
 
-          # Capture IP
-          ip=$(tailscale ip -4)
-          echo "TAILSCALE_IP=$ip" >> $GITHUB_ENV
-
-          # Basic protection: allow only Tailscale interface traffic
-          sudo ufw default deny incoming
-          sudo ufw default deny outgoing
-          sudo ufw allow in on tailscale0
-          sudo ufw allow out on tailscale0
-          sudo ufw --force enable
-
-      - name: Keep alive
+      - name: Keep alive (light)
         run: |
-          echo "Exit node address: $TAILSCALE_IP"
-          while true; do echo "[$(date)] Active"; sleep 300; done
+          echo "Exit node ready: $TAILSCALE_IP"
+          while true; do sleep 600; done
