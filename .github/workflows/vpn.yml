@@ -1,0 +1,23 @@
+name: Tailscale-VPN
+on:
+  workflow_dispatch:
+
+jobs:
+  tailscale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Install Tailscale
+        run: curl -fsSL https://tailscale.com/install.sh | sh
+
+      - name: Connect to tailnet
+        run: |
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname="vpn-${{ github.run_id }}"
+          ip=$(tailscale ip -4)
+          echo "TAILSCALE_IP=$ip" >> $GITHUB_ENV
+
+      - name: Keep alive
+        run: |
+          echo "VPN node address: $TAILSCALE_IP"
+          while true; do echo "[$(date)] Active"; sleep 300; done
