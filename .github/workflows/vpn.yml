@@ -11,13 +11,26 @@ jobs:
       - name: Install Tailscale
         run: curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Connect to tailnet
+      - name: Connect as exit node (protected)
         run: |
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname="vpn-${{ github.run_id }}"
+          # Bring up Tailscale as exit node
+          sudo tailscale up \
+            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} \
+            --hostname="vpn-${{ github.run_id }}" \
+            --advertise-exit-node
+
+          # Capture IP
           ip=$(tailscale ip -4)
           echo "TAILSCALE_IP=$ip" >> $GITHUB_ENV
 
+          # Basic protection: allow only Tailscale interface traffic
+          sudo ufw default deny incoming
+          sudo ufw default deny outgoing
+          sudo ufw allow in on tailscale0
+          sudo ufw allow out on tailscale0
+          sudo ufw --force enable
+
       - name: Keep alive
         run: |
-          echo "VPN node address: $TAILSCALE_IP"
+          echo "Exit node address: $TAILSCALE_IP"
           while true; do echo "[$(date)] Active"; sleep 300; done
