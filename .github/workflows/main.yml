@@ -59,7 +59,7 @@ jobs:
           $cred=New-Object PSCredential($u,$p)
           Start-Process cmd.exe -Credential $cred -ArgumentList "/c exit" -WindowStyle Hidden -Wait
 
-      - name: Apply FULL UI config for XService
+      - name: Apply
         shell: powershell
         run: |
           if (!(Get-PSDrive HKU -ErrorAction SilentlyContinue)) {
@@ -71,24 +71,25 @@ jobs:
           $hive="C:\Users\$u\NTUSER.DAT"
 
           if (!(Test-Path "HKU:\$sid")) {
-            reg load "HKU\$sid" "$hive"
+            reg load "HKU\$sid" "$hive" | Out-Null
           }
 
           $adv="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
           $search="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search"
           $theme="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
           $desk="HKU:\$sid\Control Panel\Desktop"
+          $colors="HKU:\$sid\Control Panel\Colors"
 
           New-Item $adv -Force | Out-Null
           Set-ItemProperty $adv TaskbarAl 0
+          Set-ItemProperty $adv ShowTaskViewButton 0
           Set-ItemProperty $adv TaskbarMn 0
           Set-ItemProperty $adv TaskbarDa 0
-          Set-ItemProperty $adv ShowTaskViewButton 0
-          Set-ItemProperty $adv TaskbarChat 0
-          Set-ItemProperty $adv EnableCopilot 0
 
           New-Item $search -Force | Out-Null
           Set-ItemProperty $search SearchboxTaskbarMode 0
+          Set-ItemProperty $search BingSearchEnabled 0
+          Set-ItemProperty $search SearchHighlightsEnabled 0
 
           New-Item $theme -Force | Out-Null
           Set-ItemProperty $theme AppsUseLightTheme 0
@@ -98,6 +99,9 @@ jobs:
           Set-ItemProperty $desk Wallpaper ""
           Set-ItemProperty $desk WallpaperStyle 0
           Set-ItemProperty $desk TileWallpaper 0
+
+          New-Item $colors -Force | Out-Null
+          Set-ItemProperty $colors Background "0 0 0"
           
       - name: Output and keep alive
         shell: powershell
