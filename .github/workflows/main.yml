@@ -54,9 +54,36 @@ jobs:
       - name: Initialize XService profile
         shell: powershell
         run: |
-          $u=$env:RDP_USER; $p=ConvertTo-SecureString $env:RDP_PASS -AsPlainText -Force
+          $u=$env:RDP_USER
+          $p=ConvertTo-SecureString $env:RDP_PASS -AsPlainText -Force
           $cred=New-Object PSCredential($u,$p)
-          Start-Process cmd.exe -Credential $cred -ArgumentList "/c whoami" -WindowStyle Hidden -Wait
+          Start-Process cmd.exe -Credential $cred -ArgumentList "/c exit" -WindowStyle Hidden -Wait
+
+      - name: Apply UI config for XService
+        shell: powershell
+        run: |
+          $u="XService"
+          $sid=(Get-LocalUser $u).Sid.Value
+          if (!(Test-Path "HKU:\$sid")) {
+            reg load "HKU\$sid" "C:\Users\$u\NTUSER.DAT"
+          }
+
+          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Force | Out-Null
+          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" TaskbarAl 0
+
+          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search" -Force | Out-Null
+          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode 0
+
+          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Force | Out-Null
+          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" AppsUseLightTheme 0
+          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" SystemUsesLightTheme 0
+
+          New-Item "HKU:\$sid\Control Panel\Desktop" -Force | Out-Null
+          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" Wallpaper ""
+          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" WallpaperStyle 0
+          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" TileWallpaper 0
+
+          reg unload "HKU\$sid" 2>$null
 
       - name: Output and keep alive
         shell: powershell
@@ -64,4 +91,4 @@ jobs:
           Write-Host "Address: $env:TAILSCALE_IP"
           Write-Host "Username: $env:RDP_USER"
           Write-Host "Password: $env:RDP_PASS"
-          while ($true) { Write-Host "[$(Get-Date)] Active"; Start-Sleep 300 }
+          while ($true) { Start-Sleep 300 }
