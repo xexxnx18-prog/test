@@ -59,32 +59,48 @@ jobs:
           $cred=New-Object PSCredential($u,$p)
           Start-Process cmd.exe -Credential $cred -ArgumentList "/c exit" -WindowStyle Hidden -Wait
 
-      - name: Apply UI config for XService
+      - name: Apply FULL UI config for XService
         shell: powershell
         run: |
-          $u="XService"
-          $sid=(Get-LocalUser $u).Sid.Value
-          if (!(Test-Path "HKU:\$sid")) {
-            reg load "HKU\$sid" "C:\Users\$u\NTUSER.DAT"
+          if (!(Get-PSDrive HKU -ErrorAction SilentlyContinue)) {
+            New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS | Out-Null
           }
 
-          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Force | Out-Null
-          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" TaskbarAl 0
+          $u="XService"
+          $sid=(Get-LocalUser $u).Sid.Value
+          $hive="C:\Users\$u\NTUSER.DAT"
 
-          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search" -Force | Out-Null
-          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search" SearchboxTaskbarMode 0
+          if (!(Test-Path "HKU:\$sid")) {
+            reg load "HKU\$sid" "$hive"
+          }
 
-          New-Item "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Force | Out-Null
-          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" AppsUseLightTheme 0
-          Set-ItemProperty "HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" SystemUsesLightTheme 0
+          $adv="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+          $search="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Search"
+          $theme="HKU:\$sid\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+          $desk="HKU:\$sid\Control Panel\Desktop"
 
-          New-Item "HKU:\$sid\Control Panel\Desktop" -Force | Out-Null
-          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" Wallpaper ""
-          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" WallpaperStyle 0
-          Set-ItemProperty "HKU:\$sid\Control Panel\Desktop" TileWallpaper 0
+          New-Item $adv -Force | Out-Null
+          Set-ItemProperty $adv TaskbarAl 0
+          Set-ItemProperty $adv TaskbarMn 0
+          Set-ItemProperty $adv TaskbarDa 0
+          Set-ItemProperty $adv ShowTaskViewButton 0
+          Set-ItemProperty $adv TaskbarChat 0
+          Set-ItemProperty $adv EnableCopilot 0
+
+          New-Item $search -Force | Out-Null
+          Set-ItemProperty $search SearchboxTaskbarMode 0
+
+          New-Item $theme -Force | Out-Null
+          Set-ItemProperty $theme AppsUseLightTheme 0
+          Set-ItemProperty $theme SystemUsesLightTheme 0
+
+          New-Item $desk -Force | Out-Null
+          Set-ItemProperty $desk Wallpaper ""
+          Set-ItemProperty $desk WallpaperStyle 0
+          Set-ItemProperty $desk TileWallpaper 0
 
           reg unload "HKU\$sid" 2>$null
-
+          
       - name: Output and keep alive
         shell: powershell
         run: |
