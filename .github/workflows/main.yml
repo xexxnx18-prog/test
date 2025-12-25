@@ -98,8 +98,6 @@ jobs:
           Set-ItemProperty $desk Wallpaper ""
           Set-ItemProperty $desk WallpaperStyle 0
           Set-ItemProperty $desk TileWallpaper 0
-
-          reg unload "HKU\$sid" 2>$null
           
       - name: Output and keep alive
         shell: powershell
